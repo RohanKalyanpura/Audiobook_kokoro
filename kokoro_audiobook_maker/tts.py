@@ -33,6 +33,57 @@ except ImportError:
 except Exception:  # pragma: no cover - defensive
     _kokoro_class = None
 
+try:  # pragma: no cover - some releases expose a separate kpipeline helper
+    from kokoro import kpipeline as _kokoro_kpipeline  # type: ignore[attr-defined]
+except ImportError:  # pragma: no cover - helper not present
+    _kokoro_kpipeline = None
+except Exception:  # pragma: no cover - defensive
+    _kokoro_kpipeline = None
+else:  # pragma: no cover - helper successfully imported
+    # ``kokoro.kpipeline`` may export either a callable or a class, so we
+    # normalise it below together with the main pipeline import.
+    pass
+
+if _kokoro_pipeline is not None and not callable(_kokoro_pipeline):
+    module = _kokoro_pipeline
+    pipeline_candidate = getattr(module, "pipeline", None)
+    if callable(pipeline_candidate):
+        _kokoro_pipeline = pipeline_candidate
+    else:
+        kpipeline_candidate = getattr(module, "kpipeline", None)
+        if callable(kpipeline_candidate):
+            _kokoro_pipeline = kpipeline_candidate
+        else:
+            _kokoro_pipeline = None
+    if _kokoro_class is None:
+        for attr_name in ("KPipeline", "Kpipeline", "kpipeline"):
+            candidate = getattr(module, attr_name, None)
+            if inspect.isclass(candidate):
+                _kokoro_class = candidate
+                break
+            if callable(candidate) and _kokoro_pipeline is None:
+                _kokoro_pipeline = candidate
+                break
+
+if _kokoro_pipeline is None and _kokoro_kpipeline is not None:
+    if callable(_kokoro_kpipeline):
+        _kokoro_pipeline = _kokoro_kpipeline
+    else:
+        if inspect.isclass(_kokoro_kpipeline) and _kokoro_class is None:
+            _kokoro_class = _kokoro_kpipeline
+        pipeline_candidate = getattr(_kokoro_kpipeline, "pipeline", None)
+        if callable(pipeline_candidate):
+            _kokoro_pipeline = pipeline_candidate
+        elif _kokoro_class is None:
+            for attr_name in ("KPipeline", "Kpipeline", "kpipeline"):
+                candidate = getattr(_kokoro_kpipeline, attr_name, None)
+                if inspect.isclass(candidate):
+                    _kokoro_class = candidate
+                    break
+                if callable(candidate) and _kokoro_pipeline is None:
+                    _kokoro_pipeline = candidate
+                    break
+
 try:  # pragma: no cover
     from kokoro import voices as kokoro_voices  # type: ignore[attr-defined]
 except ImportError:
