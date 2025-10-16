@@ -55,11 +55,11 @@ Turn your ebooks (PDF & EPUB) into clean, chaptered audiobooks with a simple des
 
 ```bash
 # 1) Create a virtual environment (recommended)
-python -m venv .venv
+py -3.12 -m venv .venv312
 # Windows:
-.venv\Scripts\activate
+.\.venv312\Scripts\Activate.ps1
 # macOS/Linux:
-source .venv/bin/activate
+source .venv/bin/activate.ps1
 
 # 2) Core dependencies
 pip install --upgrade pip wheel
