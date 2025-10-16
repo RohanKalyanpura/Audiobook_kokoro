@@ -71,7 +71,7 @@ pip install kokoro
 pip install pyside6 ebooklib pypdf unidecode regex tqdm sentencepiece
 
 # Audio, chapters, tags
-pip install pydub mutagen
+pip install numpy pydub mutagen
 
 # Optional: faster sentence splitting & language detection
 pip install spacy langdetect

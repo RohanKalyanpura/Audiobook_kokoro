@@ -69,6 +69,7 @@ class RenderWorker(QThread):
         voice: str,
         speed: float,
         pitch: float,
+        lang_code: str,
         output_dir: Path,
         output_format: str,
         template: str,
@@ -85,6 +86,7 @@ class RenderWorker(QThread):
         self.voice = voice
         self.speed = speed
         self.pitch = pitch
+        self.lang_code = lang_code
         self.output_dir = output_dir
         self.output_format = output_format
         self.template = template
@@ -517,6 +519,12 @@ class MainWindow(QMainWindow):
         self._worker = worker
         self.convertButton.setEnabled(False)
         worker.start()
+
+    def _current_lang_code(self) -> str:
+        data = self.languageCombo.currentData()
+        if isinstance(data, str) and data:
+            return data
+        return "a"
 
     def _normalization_options(self) -> NormalizationOptions:
         options = NormalizationOptions(
