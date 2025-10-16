@@ -169,9 +169,17 @@ flowchart LR
 
 ## CLI (optional)
 
-The package also exposes a simple CLI for automation:
+The repo now ships a CLI that reuses the exact conversion backend as the GUI.
+Install the project in editable mode (or build a wheel) and launch the
+`kokoro-book` entry point:
 
 ```bash
+pip install -e .
+
+# Show the available options
+kokoro-book --help
+
+# Convert an EPUB using cached chapters and strong normalization
 kokoro-book \
   --in "books/Moby-Dick.epub" \
   --out "output/Moby-Dick.m4b" \
@@ -180,12 +188,37 @@ kokoro-book \
   --bitrate 160k \
   --speed 1.05 \
   --chapters auto \
-  --normalize strong
+  --normalize strong \
+  --resume
 ```
 
-* `--chapters auto|none|file.json` (custom chapter JSON `{start_ms,title}`)
-* `--dict pronunciations.csv` (CSV: `pattern,replace`)
-* `--resume` (skip already rendered chapters)
+Key options:
+
+* `--chapters auto|none|path/to/file.json` — reuse GUI-exported chapters or let
+  the backend detect headings automatically.
+* `--dict pronunciations.csv` — apply the same pronunciation dictionary the GUI
+  understands (`pattern,replace`).
+* `--meta key=value` — add metadata (title, author, series, …) to the rendered
+  manifest.
+* `--cache-dir /tmp/cache --resume` — control caching and resume partially
+  rendered audiobooks.
+
+### Testing the CLI locally
+
+You can exercise the CLI against any text document (the converter falls back to
+plain-text processing when it cannot decode EPUB/PDF assets):
+
+```bash
+python -m kokoro_audiobook_maker.cli \
+  --in examples/sample.txt \
+  --out /tmp/sample.m4b \
+  --voice af_heart \
+  --chapters auto \
+  --normalize light
+```
+
+`kokoro-book` and `python -m kokoro_audiobook_maker.cli` share the exact same
+code path, so either command is valid during development.
 
 ---
 
