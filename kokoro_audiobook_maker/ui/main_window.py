@@ -98,10 +98,7 @@ class RenderWorker(QThread):
         self.cache_dir = cache_dir
         self.reuse_cache = reuse_cache
         self.synthesizer = KokoroSynthesizer(
-            cache=ChapterCache(self.cache_dir),
-            silence_padding_ms=self.silence_ms,
-            lang_code=self.lang_code,
-            default_sample_rate=self.sample_rate,
+            cache=ChapterCache(self.cache_dir), silence_padding_ms=self.silence_ms
         )
 
     def run(self) -> None:  # pragma: no cover - executed in thread
@@ -206,18 +203,6 @@ class MainWindow(QMainWindow):
 
         self.voiceCombo = QComboBox(central)
         options_layout.addRow("Voice", self.voiceCombo)
-
-        self.languageCombo = QComboBox(central)
-        self.languageCombo.addItem("Auto (detect)", "a")
-        self.languageCombo.addItem("English", "en")
-        self.languageCombo.addItem("Spanish", "es")
-        self.languageCombo.addItem("French", "fr")
-        self.languageCombo.addItem("German", "de")
-        self.languageCombo.addItem("Italian", "it")
-        self.languageCombo.addItem("Japanese", "ja")
-        self.languageCombo.addItem("Korean", "ko")
-        self.languageCombo.addItem("Mandarin", "zh")
-        options_layout.addRow("Language", self.languageCombo)
 
         self.speedSpin = QDoubleSpinBox(central)
         self.speedSpin.setRange(0.5, 2.0)
@@ -490,8 +475,6 @@ class MainWindow(QMainWindow):
             synth = KokoroSynthesizer(
                 cache=ChapterCache(self._cache_dir),
                 silence_padding_ms=self.silenceSpin.value(),
-                lang_code=self._current_lang_code(),
-                default_sample_rate=int(self.sampleRateCombo.currentText()),
             )
             audio = synth.synthesize_chapter(
                 Chapter(index=chapter.index, title=chapter.title, text=normalized_text),
@@ -519,7 +502,6 @@ class MainWindow(QMainWindow):
             voice=self.voiceCombo.currentText(),
             speed=self.speedSpin.value(),
             pitch=self.pitchSpin.value(),
-            lang_code=self._current_lang_code(),
             output_dir=Path(output_dir),
             output_format=self.formatCombo.currentText().lower(),
             template=self.outputTemplateEdit.text(),
