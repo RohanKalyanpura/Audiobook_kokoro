@@ -1,15 +1,12 @@
-"""Kokoro Audiobook Maker package."""
-
-from .app import main
-
-__all__ = ["main"]
-"""Core package for the Kokoro Audiobook Maker."""
+"""Kokoro Audiobook Maker package exports."""
 
 from __future__ import annotations
 
+from .app import main
 from .converter import AudiobookConverter, ConversionOptions, ConversionResult
 
 __all__ = [
+    "main",
     "AudiobookConverter",
     "ConversionOptions",
     "ConversionResult",

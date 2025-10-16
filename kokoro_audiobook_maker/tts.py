@@ -95,15 +95,21 @@ class KokoroSynthesizer:
         voice: str,
         speed: float = 1.0,
         pitch: float = 0.0,
+        use_cache: bool = True,
         progress: Optional[ProgressCallback] = None,
     ) -> ChapterAudio:
         cache_path = self.cache.path_for(chapter, voice, speed, pitch)
         if cache_path.exists():
-            LOGGER.info("Using cached render for chapter '%s'", chapter.title)
-            audio = AudioSegment.from_file(cache_path)
-            if progress:
-                progress(chapter.title, 1.0)
-            return ChapterAudio(chapter=chapter, path=cache_path, duration_ms=len(audio))
+            if use_cache:
+                LOGGER.info("Using cached render for chapter '%s'", chapter.title)
+                audio = AudioSegment.from_file(cache_path)
+                if progress:
+                    progress(chapter.title, 1.0)
+                return ChapterAudio(chapter=chapter, path=cache_path, duration_ms=len(audio))
+            try:
+                cache_path.unlink()
+            except FileNotFoundError:
+                pass
 
         if pipeline is None:
             raise RuntimeError("kokoro pipeline is not available; install the kokoro package")
@@ -138,6 +144,7 @@ class KokoroSynthesizer:
         voice: str,
         speed: float = 1.0,
         pitch: float = 0.0,
+        use_cache: bool = True,
         progress: Optional[ProgressCallback] = None,
     ) -> List[ChapterAudio]:
         rendered: List[ChapterAudio] = []
@@ -157,6 +164,7 @@ class KokoroSynthesizer:
                     voice=voice,
                     speed=speed,
                     pitch=pitch,
+                    use_cache=use_cache,
                     progress=chapter_progress,
                 )
             )
