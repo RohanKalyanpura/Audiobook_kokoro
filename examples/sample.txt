@@ -1,0 +1,10 @@
+# Sample Book
+
+Chapter One
+This is a short example chapter that demonstrates how the shared backend splits
+content when the CLI runs in "auto" chapter mode. The content is intentionally
+minimal so it runs instantly in tests.
+
+Chapter Two
+A second chapter provides enough material for the cache system to kick in when
+`--resume` is used.

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kokoro-audiobook-maker"
+version = "0.1.0"
+description = "CLI and backend scaffolding for the Kokoro Audiobook Maker"
+readme = "README.md"
+authors = [
+  { name = "Kokoro Contributors" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = []
+
+[project.urls]
+Homepage = "https://example.com/kokoro-audiobook-maker"
+
+[project.scripts]
+kokoro-book = "kokoro_audiobook_maker.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["kokoro_audiobook_maker*"]
