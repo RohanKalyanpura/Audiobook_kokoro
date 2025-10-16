@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import inspect
 import json
 import logging
@@ -32,6 +33,87 @@ except ImportError:
     _kokoro_class = None
 except Exception:  # pragma: no cover - defensive
     _kokoro_class = None
+
+try:  # pragma: no cover - some releases expose a separate kpipeline helper
+    from kokoro import kpipeline as _kokoro_kpipeline  # type: ignore[attr-defined]
+except ImportError:  # pragma: no cover - helper not present
+    _kokoro_kpipeline = None
+except Exception:  # pragma: no cover - defensive
+    _kokoro_kpipeline = None
+else:  # pragma: no cover - helper successfully imported
+    # ``kokoro.kpipeline`` may export either a callable or a class, so we
+    # normalise it below together with the main pipeline import.
+    pass
+
+def _normalise_exports(module_like):
+    """Return callable pipeline and class exports from a module-like object."""
+
+    pipeline_candidate = getattr(module_like, "pipeline", None)
+    kpipeline_candidate = getattr(module_like, "kpipeline", None)
+    class_candidates = [
+        getattr(module_like, name, None) for name in ("KPipeline", "Kpipeline", "kpipeline")
+    ]
+
+    pipeline_callable = None
+    for candidate in (pipeline_candidate, kpipeline_candidate):
+        if callable(candidate):
+            pipeline_callable = candidate
+            break
+
+    class_export = next((c for c in class_candidates if inspect.isclass(c)), None)
+
+    if pipeline_callable is None:
+        pipeline_callable = next((c for c in class_candidates if callable(c)), None)
+
+    return pipeline_callable, class_export
+
+
+def _import_module_attribute(module_path: str, attr: str):
+    """Attempt to import ``attr`` from ``module_path`` returning ``None`` on failure."""
+
+    try:  # pragma: no cover - defensive import helper
+        module = importlib.import_module(module_path)
+    except Exception:
+        return None
+    return getattr(module, attr, None)
+
+
+if _kokoro_pipeline is not None and not callable(_kokoro_pipeline):
+    pipeline_callable, class_export = _normalise_exports(_kokoro_pipeline)
+    _kokoro_pipeline = pipeline_callable
+    if _kokoro_class is None:
+        _kokoro_class = class_export
+
+if _kokoro_pipeline is None and _kokoro_kpipeline is not None:
+    if callable(_kokoro_kpipeline):
+        _kokoro_pipeline = _kokoro_kpipeline
+    else:
+        pipeline_callable, class_export = _normalise_exports(_kokoro_kpipeline)
+        _kokoro_pipeline = pipeline_callable
+        if _kokoro_class is None:
+            _kokoro_class = class_export
+
+if _kokoro_pipeline is None:
+    _kokoro_pipeline = _import_module_attribute("kokoro.pipeline", "pipeline")
+    if callable(_kokoro_pipeline):
+        _pipeline_import_error = None
+
+if _kokoro_pipeline is None:
+    _kokoro_pipeline = _import_module_attribute("kokoro.pipeline", "kpipeline")
+    if callable(_kokoro_pipeline):
+        _pipeline_import_error = None
+
+if _kokoro_class is None:
+    _kokoro_class = _import_module_attribute("kokoro", "KPipeline")
+
+if _kokoro_class is None:
+    _kokoro_class = _import_module_attribute("kokoro.pipeline", "KPipeline")
+
+if _kokoro_pipeline is not None and not callable(_kokoro_pipeline):
+    pipeline_callable, class_export = _normalise_exports(_kokoro_pipeline)
+    _kokoro_pipeline = pipeline_callable
+    if _kokoro_class is None:
+        _kokoro_class = class_export
 
 try:  # pragma: no cover
     from kokoro import voices as kokoro_voices  # type: ignore[attr-defined]
