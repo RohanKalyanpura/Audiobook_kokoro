@@ -8,6 +8,139 @@ import types
 from pathlib import Path
 from typing import Dict, List
 
+try:  # pragma: no cover - numpy may be unavailable in test environment
+    import numpy as np  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - lightweight numpy stub for tests
+    fake_numpy = types.ModuleType("numpy")
+
+    class _FakeScalarType:
+        def __init__(self, kind: str, itemsize: int, *, min_value=None, max_value=None):
+            self.kind = kind
+            self.itemsize = itemsize
+            self.min = min_value
+            self.max = max_value
+
+        def __call__(self, value):
+            if self.kind == "i":
+                return int(value)
+            return float(value)
+
+    _float32 = _FakeScalarType("f", 4)
+    _int16 = _FakeScalarType("i", 2, min_value=-32768, max_value=32767)
+
+    class _FakeNDArray(list):
+        def __init__(self, data, dtype):
+            super().__init__(data)
+            self._dtype = dtype
+
+        @property
+        def dtype(self):
+            return self._dtype
+
+        @property
+        def ndim(self):
+            return 1
+
+        def reshape(self, *_):
+            return self
+
+        def astype(self, dtype):
+            target = dtype if isinstance(dtype, _FakeScalarType) else _float32
+            return _FakeNDArray([target(x) for x in self], target)
+
+        def clip(self, min_value, max_value):
+            return _FakeNDArray(
+                [max(min(x, max_value), min_value) for x in self],
+                self._dtype,
+            )
+
+        def tobytes(self):
+            if self._dtype is not _int16:
+                raise TypeError("only int16 conversion supported in fake numpy")
+            import struct
+
+            return struct.pack("<" + "h" * len(self), *[int(x) for x in self])
+
+        def __mul__(self, other):
+            if isinstance(other, (int, float)):
+                return _FakeNDArray([x * other for x in self], self._dtype)
+            return NotImplemented
+
+        __rmul__ = __mul__
+
+    def _asarray(value):
+        if isinstance(value, _FakeNDArray):
+            return value
+        if isinstance(value, (bytes, bytearray)):
+            return fake_numpy.frombuffer(bytes(value), fake_numpy.int16)
+        if isinstance(value, (list, tuple)):
+            if not value:
+                return _FakeNDArray([], _float32)
+            data = []
+            dtype = _float32
+            for item in value:
+                if isinstance(item, _FakeNDArray):
+                    data.extend(item)
+                    dtype = item.dtype
+                else:
+                    data.append(float(item))
+            return _FakeNDArray(data, dtype)
+        return _FakeNDArray([float(value)], _float32)
+
+    def _concatenate(arrays):
+        arrays = [_asarray(item) for item in arrays]
+        if not arrays:
+            return _FakeNDArray([], _float32)
+        dtype = arrays[0].dtype
+        data = []
+        for array in arrays:
+            data.extend(array)
+        return _FakeNDArray(data, dtype)
+
+    def _frombuffer(buffer, dtype):
+        if dtype is not _int16:
+            raise TypeError("fake numpy only supports int16 buffers")
+        import struct
+
+        count = len(buffer) // dtype.itemsize
+        if count == 0:
+            return _FakeNDArray([], dtype)
+        values = struct.unpack("<" + "h" * count, buffer[: count * dtype.itemsize])
+        return _FakeNDArray(list(values), dtype)
+
+    def _zeros(length, dtype=None):
+        target = dtype if isinstance(dtype, _FakeScalarType) else _float32
+        return _FakeNDArray([target(0) for _ in range(length)], target)
+
+    def _linspace(start, stop, num, dtype=None):
+        if num <= 1:
+            values = [start]
+        else:
+            step = (stop - start) / (num - 1)
+            values = [start + step * i for i in range(num)]
+        target = dtype if isinstance(dtype, _FakeScalarType) else _float32
+        return _FakeNDArray([target(v) for v in values], target)
+
+    class _FakeIInfo:
+        def __init__(self, dtype):
+            self.max = dtype.max
+
+    def _iinfo(dtype):
+        return _FakeIInfo(dtype)
+
+    fake_numpy.ndarray = _FakeNDArray
+    fake_numpy.asarray = _asarray
+    fake_numpy.concatenate = _concatenate
+    fake_numpy.frombuffer = _frombuffer
+    fake_numpy.zeros = _zeros
+    fake_numpy.linspace = _linspace
+    fake_numpy.iinfo = _iinfo
+    fake_numpy.int16 = _int16
+    fake_numpy.float32 = _float32
+
+    np = fake_numpy  # type: ignore
+    sys.modules.setdefault("numpy", fake_numpy)
+
 import pytest
 
 _dummy_pyside6 = types.ModuleType("PySide6")
@@ -220,6 +353,42 @@ def test_pipeline_function_is_used_for_synthesis(monkeypatch, tmp_path):
     assert calls[0]["text"] == chapter.text
     assert calls[0]["voice"] == "af_heart"
     assert calls[0]["sample_rate"] == 16000
+    assert result.duration_ms > 0
+    assert result.path.exists()
+
+
+def test_pipeline_handles_nested_audio_sequences(monkeypatch, tmp_path):
+    def _inner_generator():
+        yield np.linspace(0.5, -0.5, 16, dtype=np.float32)
+        yield (np.zeros(8, dtype=np.float32) for _ in range(2))
+
+    def _outer_generator():
+        yield np.linspace(-0.5, 0.5, 32, dtype=np.float32)
+        yield _inner_generator()
+        yield b"\x00\x00" * 8
+
+    def fake_pipeline(text, *, voice, speed=1.0, pitch=0.0, sample_rate=None):
+        nested_audio = _outer_generator()
+        yield {
+            "audio": nested_audio,
+            "sample_rate": sample_rate or 16000,
+        }
+
+    monkeypatch.setattr(tts, "_kokoro_pipeline", fake_pipeline)
+    monkeypatch.setattr(tts, "_kokoro_class", None)
+
+    synthesizer = tts.KokoroSynthesizer(
+        cache=tts.ChapterCache(base_dir=tmp_path),
+        default_sample_rate=22050,
+    )
+    chapter = Chapter(index=3, title="Nested", text="Nested audio test")
+
+    result = synthesizer.synthesize_chapter(
+        chapter,
+        voice="af_heart",
+        use_cache=False,
+    )
+
     assert result.duration_ms > 0
     assert result.path.exists()
 
