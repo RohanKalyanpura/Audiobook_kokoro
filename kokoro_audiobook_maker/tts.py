@@ -9,6 +9,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Iterable as IterableABC
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from mutagen.easyid3 import EasyID3
