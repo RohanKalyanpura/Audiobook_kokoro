@@ -268,11 +268,12 @@ class AudiobookConverter:
 
     # Audio synthesis -------------------------------------------------------------
     def _chapter_cache_key(self, chapter: Chapter, options: ConversionOptions) -> str:
+        text_digest = hashlib.sha1(chapter.text.encode("utf-8")).hexdigest()
         fingerprint = "|".join(
             [
                 str(options.input_path.resolve()),
                 chapter.title,
-                str(len(chapter.text)),
+                text_digest,
                 options.voice,
                 f"{options.speed:.2f}",
                 options.format,
