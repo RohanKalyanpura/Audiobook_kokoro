@@ -261,33 +261,20 @@ class KokoroSynthesizer:
         error if neither can be located.
         """
 
-        if callable(_kokoro_pipeline):
-            signature_params = _signature_parameters(_kokoro_pipeline)
+        pipeline_class = _kokoro_class
+        if pipeline_class is None and inspect.isclass(_kokoro_pipeline):
+            pipeline_class = _kokoro_pipeline  # type: ignore[assignment]
 
-            def _call_pipeline(*, text: str, voice: str, speed: float, pitch: float):
-                kwargs = _build_pipeline_kwargs(
-                    signature_params,
-                    voice=voice,
-                    speed=speed,
-                    pitch=pitch,
-                    lang_code=self.lang_code,
-                    device=self.device,
-                    default_sample_rate=self.default_sample_rate,
-                )
-                return _kokoro_pipeline(text, **kwargs)  # type: ignore[misc]
-
-            return _call_pipeline
-
-        if _kokoro_class is not None:
-            if self._pipeline_instance is None:
-                init_params = _signature_parameters(_kokoro_class)
+        if pipeline_class is not None:
+            if self._pipeline_instance is None or not isinstance(self._pipeline_instance, pipeline_class):
+                init_params = _signature_parameters(pipeline_class)
                 init_kwargs = {}
                 if self.lang_code is not None and "lang_code" in init_params:
                     init_kwargs["lang_code"] = self.lang_code
                 if self.device is not None and "device" in init_params:
                     init_kwargs["device"] = self.device
                 try:
-                    self._pipeline_instance = _kokoro_class(**init_kwargs)
+                    self._pipeline_instance = pipeline_class(**init_kwargs)
                 except Exception as exc:  # pragma: no cover - runtime guard
                     raise RuntimeError(
                         "failed to initialise kokoro.KPipeline; check your kokoro installation"
@@ -310,6 +297,23 @@ class KokoroSynthesizer:
                 )
 
             return _call_instance
+
+        if callable(_kokoro_pipeline) and not inspect.isclass(_kokoro_pipeline):
+            signature_params = _signature_parameters(_kokoro_pipeline)
+
+            def _call_pipeline(*, text: str, voice: str, speed: float, pitch: float):
+                kwargs = _build_pipeline_kwargs(
+                    signature_params,
+                    voice=voice,
+                    speed=speed,
+                    pitch=pitch,
+                    lang_code=self.lang_code,
+                    device=self.device,
+                    default_sample_rate=self.default_sample_rate,
+                )
+                return _kokoro_pipeline(text, **kwargs)  # type: ignore[misc]
+
+            return _call_pipeline
 
         message = "kokoro pipeline is not available; install the kokoro package"
         if _pipeline_import_error is not None:
