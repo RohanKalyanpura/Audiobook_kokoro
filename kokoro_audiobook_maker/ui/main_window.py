@@ -69,7 +69,7 @@ class RenderWorker(QThread):
         voice: str,
         speed: float,
         pitch: float,
-        lang_code: str,
+        lang_code: str = "a",
         output_dir: Path,
         output_format: str,
         template: str,
@@ -98,7 +98,9 @@ class RenderWorker(QThread):
         self.cache_dir = cache_dir
         self.reuse_cache = reuse_cache
         self.synthesizer = KokoroSynthesizer(
-            cache=ChapterCache(self.cache_dir), silence_padding_ms=self.silence_ms
+            cache=ChapterCache(self.cache_dir),
+            silence_padding_ms=self.silence_ms,
+            lang_code=lang_code,
         )
 
     def run(self) -> None:  # pragma: no cover - executed in thread
