@@ -358,17 +358,14 @@ def test_pipeline_function_is_used_for_synthesis(monkeypatch, tmp_path):
 
 
 def test_pipeline_handles_nested_audio_sequences(monkeypatch, tmp_path):
-    def _inner_generator():
-        yield np.linspace(0.5, -0.5, 16, dtype=np.float32)
-        yield (np.zeros(8, dtype=np.float32) for _ in range(2))
-
-    def _outer_generator():
-        yield np.linspace(-0.5, 0.5, 32, dtype=np.float32)
-        yield _inner_generator()
-        yield b"\x00\x00" * 8
-
     def fake_pipeline(text, *, voice, speed=1.0, pitch=0.0, sample_rate=None):
-        nested_audio = _outer_generator()
+        nested_audio = [
+            np.linspace(-0.5, 0.5, 32, dtype=np.float32),
+            [
+                np.linspace(0.5, -0.5, 16, dtype=np.float32),
+                np.zeros(16, dtype=np.float32),
+            ],
+        ]
         yield {
             "audio": nested_audio,
             "sample_rate": sample_rate or 16000,

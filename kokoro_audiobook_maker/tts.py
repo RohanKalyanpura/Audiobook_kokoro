@@ -331,43 +331,33 @@ def _segment_from_chunk(chunk, sample_rate: Optional[int]) -> AudioSegment:
     else:
         np = _require_numpy()
 
-        def _is_audio_iterable(value) -> bool:
-            if isinstance(value, (bytes, bytearray, str)):
-                return False
-            if hasattr(value, "detach") and hasattr(value, "cpu"):
-                return False
-            if isinstance(value, np.ndarray):
-                return False
-            return isinstance(value, Sequence) or isinstance(value, IterableABC)
-
         def _flatten_audio_sequence(sequence):
             if isinstance(sequence, (bytes, bytearray, str)):
                 return sequence
-            if hasattr(sequence, "detach") and hasattr(sequence, "cpu"):
-                return sequence.detach().cpu().numpy()
-            if isinstance(sequence, np.ndarray):
+            if not isinstance(sequence, Sequence):
                 return sequence
-            if not _is_audio_iterable(sequence):
-                return sequence
-
             items = list(sequence)
             if not items:
-                return np.asarray([], dtype=np.int16)
+                return np.asarray(items)
 
             arrays = []
             for item in items:
-                flattened = _flatten_audio_sequence(item)
-                if isinstance(flattened, (bytes, bytearray)):
-                    array_item = np.frombuffer(bytes(flattened), dtype=np.int16)
+                if isinstance(item, (bytes, bytearray)):
+                    array_item = np.frombuffer(bytes(item), dtype=np.int16)
+                elif hasattr(item, "detach") and hasattr(item, "cpu"):
+                    array_item = item.detach().cpu().numpy()
+                elif isinstance(item, np.ndarray):
+                    array_item = item
+                elif isinstance(item, Sequence) and not isinstance(item, (str, bytes, bytearray)):
+                    array_item = _flatten_audio_sequence(item)
                 else:
-                    array_item = np.asarray(flattened)
+                    array_item = np.asarray(item)
 
+                array_item = np.asarray(array_item)
                 if array_item.ndim != 1:
                     array_item = array_item.reshape(-1)
                 arrays.append(array_item)
 
-            if not arrays:
-                return np.asarray([], dtype=np.int16)
             if len(arrays) == 1:
                 return arrays[0]
             return np.concatenate(arrays)
@@ -377,7 +367,7 @@ def _segment_from_chunk(chunk, sample_rate: Optional[int]) -> AudioSegment:
         elif isinstance(chunk, np.ndarray):
             array = chunk
         else:
-            if _is_audio_iterable(chunk):
+            if isinstance(chunk, Sequence) and not isinstance(chunk, (str, bytes, bytearray)):
                 chunk = _flatten_audio_sequence(chunk)
             array = np.asarray(chunk)
         if array.ndim != 1:
